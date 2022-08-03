@@ -1,0 +1,84 @@
+services:
+  golang-database:
+    container_name: golang-database
+    # mem_limit: 512MiB
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    restart: always
+    environment:
+      - TZ=Asia/Bangkok
+      - POSTGRES_DB=go-db
+      - POSTGRES_USER=go-user
+      - POSTGRES_PASSWORD=go-password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "go-db"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s 
+    # image: postgres:12.10
+    image: postgres:latest
+    # ports:
+      # - 5432:5432
+    networks:
+      - go-network
+  
+  pg-admin:
+    container_name: pg-admin
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    restart: always
+    image: dpage/pgadmin4
+    environment:
+      - TZ=Asia/Bangkok
+      - PGADMIN_DEFAULT_EMAIL=admin@mail.com
+      - PGADMIN_DEFAULT_PASSWORD=P@ssw0rd
+    ports:
+      - 9000:80
+    networks:
+      - go-network
+
+  kong:
+    container_name: golang-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: on-failure:5
+    depends_on:
+      golang-database:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    environment:
+      - TZ=Asia/Bangkok
+      - DB_HOST=golang-database
+      - DB_PORT=5432
+      - DB_USERNAME=go-user
+      - DB_PASSWORD=go-password
+      - DB_NAME=go-db
+    ports:
+      - 8080:8080
+    networks:
+      - go-network
+
+networks:
+  go-network:
+    driver: bridge
